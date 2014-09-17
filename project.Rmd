@@ -1,24 +1,28 @@
 Practical Machine Learning Project
 ======
+
+The first step is to load the proper libraries and to load the provided datasets
+
 ```{r}
 library(caret)
 library(corrplot)
 library(randomForest)
 
+#load training/testing datasets
 training_data = read.csv("./pml-training.csv")
 testing_data = read.csv("./pml-testing.csv")
 ```
 
-STEP 1: Pre-process/clean the data
+Step 1: Pre-process/clean the data
 -------
 
-Remove columns that have no learning significance
+Before training, it is useful to do some pre-processing on the training data in order to improve the classification performance. First I removed the first 7 columns since they have no learning significance and can be disregarded.
 
 ```{r}
 training_cleaned = training_data[,-(1:7)]
 ```
 
-Remove columns that have low variance
+The next pre-processing step I do is to remove columns that have zero to low variance since it is hard to get any meaningful information from values that are all very similar.
 
 ```{r}
 nsv = nearZeroVar(training_cleaned,saveMetrics=TRUE)
@@ -26,21 +30,22 @@ nsv_list = nsv$nzv
 training_cleaned = training_cleaned[,!nsv_list]
 ```
 
-colSums(is.na(new_training)) shows that columns with NA, mostly have NA, and therefore can be removed
+Finally I remove columns that mainly consist of NA values.
 
 ```{r}
+#colSums(is.na(new_training)) shows that columns with NA, mostly have NA, and therefore can be removed
 training_cleaned = training_cleaned[,colSums(is.na(training_cleaned)) == 0]
 ```
 
-In order to predict on the testing set, we must also remove the same columns from the testing set that we removed from the training set
+In order to do prediction on the testing set later, we must also remove the same columns from the testing set that we removed from the training set
 
 ```{r}
 testing = testing_data[,which(names(testing_data)%in%names(training_cleaned))]
 ```
 
-STEP 2: Partition the data for training/cross-validation
+Step 2: Partition the data for training/cross-validation
 -------
-(70% training, 30% CV)
+In order to build a robust learning system, it is necessary to do some cross-validation evaluation. Here I split the training data into a training set and a cross validation set. I use the recommended 70% for training and 30% for cross-validation.
 
 ```{r}
 inTrain = createDataPartition(y = training_cleaned$classe, p = 0.7, list=FALSE)
@@ -48,32 +53,37 @@ training = training_cleaned[inTrain, ]
 crossvalidation = training_cleaned[-inTrain, ]
 ```
 
-Plot a correlation matrix
-
-```{r}
-cm = cor(training[, -length(training)])
-corrplot(cm, order = "FPC", method = "circle", type = "lower", tl.cex = 0.8,  tl.col = rgb(0, 0, 0))
-```
-
-STEP 3: Fit a model with the random forest classifier
+Step 3: Fit a model with the random forest classifier
 -------
+Now that the data has been partitioned, we can now train a model using our training set. I use the random forest classifier, which is known to be a fairly accurate classifier, with the number of trees equal to 300.
+
 ```{r}
-modFit = randomForest(y=training$classe,x=training[-53],ntree=50)
+modFit = randomForest(y=training$classe,x=training[-53],ntree=300)
 
 #Show model
 modFit
 ```
 
-STEP 4: Predict on the CV set
+By generating a confusion matrix, we see that the OOB (Out-of-bag) error is 0.5%. Since the estimated error is reasonable, we go on to the cross-validation step to verify this estimated error.
+
+Step 4: Predict on the CV set
 -------
+We can now use the fitted model to cross validate the prediction results.
+
 ```{r}
 pred_cv = predict(modFit,crossvalidation)
 
+#show the confusion matrix
 confusionMatrix(crossvalidation$classe,pred_cv)
 ```
 
-STEP 5: Predict on the testing set
+By generating the confusion matrix for the cross-validation predictions, we see that we achieve a fairly high accuracy of 99.5%. As a result, we have validated our model and deem it accurate enough to predict and classify new data points.
+
+Step 5: Predict on the testing set
 -------
+
+Finally we predict the classes for the testing set. Below are the results of the predictions.
+
 ```{r}
 pred_test = predict(modFit,testing)
 
